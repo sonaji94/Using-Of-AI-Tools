@@ -1,0 +1,34 @@
+
+export enum ResourceType {
+  TEXTBOOK = 'Textbook',
+  NOTES = 'Notes',
+  QUESTION_PAPER = 'Question Paper',
+  RESEARCH_PAPER = 'Research Paper'
+}
+
+export enum Department {
+  CSE = 'Computer Science',
+  EEE = 'Electrical Engineering',
+  CIVIL = 'Civil Engineering',
+  MBA = 'Business Administration',
+  BCA = 'Computer Applications',
+  SCIENCE = 'Pure Science'
+}
+
+export interface Resource {
+  id: string;
+  title: string;
+  author: string;
+  department: Department;
+  type: ResourceType;
+  description: string;
+  thumbnail: string;
+  downloadUrl: string;
+  pages?: number;
+  year?: number;
+}
+
+export interface ChatMessage {
+  role: 'user' | 'model' | 'system';
+  content: string;
+}

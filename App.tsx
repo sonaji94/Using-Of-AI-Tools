@@ -1,5 +1,4 @@
-
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Department, ResourceType, Resource } from './types';
 import { MOCK_RESOURCES } from './constants';
 import Sidebar from './components/Sidebar';
@@ -11,18 +10,57 @@ const App: React.FC = () => {
   const [selectedDept, setSelectedDept] = useState<Department | 'All'>('All');
   const [selectedType, setSelectedType] = useState<ResourceType | 'All'>('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
+
+  // 🔍 Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // 💾 Load filters from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('libraryFilters');
+    if (saved) {
+      const { dept, type, query } = JSON.parse(saved);
+      setSelectedDept(dept);
+      setSelectedType(type);
+      setSearchQuery(query);
+    }
+  }, []);
+
+  // 💾 Save filters to localStorage
+  useEffect(() => {
+    localStorage.setItem(
+      'libraryFilters',
+      JSON.stringify({
+        dept: selectedDept,
+        type: selectedType,
+        query: searchQuery,
+      })
+    );
+  }, [selectedDept, selectedType, searchQuery]);
+
+  // ❌ Close chat if resource changes
+  useEffect(() => {
+    setIsChatOpen(false);
+  }, [selectedResource]);
 
   const filteredResources = useMemo(() => {
     return MOCK_RESOURCES.filter(res => {
       const matchDept = selectedDept === 'All' || res.department === selectedDept;
       const matchType = selectedType === 'All' || res.type === selectedType;
-      const matchSearch = res.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          res.author.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchSearch =
+        res.title.toLowerCase().includes(debouncedQuery.toLowerCase()) ||
+        res.author.toLowerCase().includes(debouncedQuery.toLowerCase());
+
       return matchDept && matchType && matchSearch;
     });
-  }, [selectedDept, selectedType, searchQuery]);
+  }, [selectedDept, selectedType, debouncedQuery]);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -33,14 +71,16 @@ const App: React.FC = () => {
             <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-black text-2xl shadow-lg">S</div>
             <div>
               <h1 className="text-xl font-black text-slate-800 tracking-tight leading-none">SUDL</h1>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Sharnbasava Digital Library</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                Sharnbasava Digital Library
+              </p>
             </div>
           </div>
-          
+
           <div className="relative flex-1 max-w-xl group">
-            <input 
-              type="text" 
-              placeholder="Search textbooks, notes, or authors..." 
+            <input
+              type="text"
+              placeholder="Search textbooks, notes, or authors..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-slate-100 border-none rounded-full py-2 px-12 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all outline-none text-slate-700"
@@ -62,46 +102,57 @@ const App: React.FC = () => {
         </div>
       </nav>
 
-      {/* Main Content */}
+      {/* Main */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 md:px-8 py-8 flex flex-col md:flex-row gap-8">
-        <Sidebar 
-          selectedDept={selectedDept} 
-          setSelectedDept={setSelectedDept} 
-          selectedType={selectedType} 
-          setSelectedType={setSelectedType} 
+        <Sidebar
+          selectedDept={selectedDept}
+          setSelectedDept={setSelectedDept}
+          selectedType={selectedType}
+          setSelectedType={setSelectedType}
         />
-        
+
         <div className="flex-1">
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-2xl font-bold text-slate-800">
               {selectedDept === 'All' ? 'All Resources' : `${selectedDept} Resources`}
               <span className="ml-3 text-sm font-normal text-slate-400">({filteredResources.length} items)</span>
             </h2>
+
             <div className="flex gap-2">
-              <button className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 shadow-sm">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
-                </svg>
+              <button
+                onClick={() => {
+                  setSelectedDept('All');
+                  setSelectedType('All');
+                  setSearchQuery('');
+                }}
+                className="px-3 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+              >
+                Clear Filters
               </button>
             </div>
           </div>
 
-          <ResourceGrid 
-            resources={filteredResources} 
+          <ResourceGrid
+            resources={filteredResources}
             onSelect={(res) => setSelectedResource(res)}
           />
+
+          {filteredResources.length === 0 && (
+            <div className="text-center py-16 text-slate-500">
+              <p className="text-lg font-semibold">No resources found</p>
+              <p className="text-sm">Try changing filters or search keyword</p>
+            </div>
+          )}
         </div>
       </main>
 
-      {/* Resource Detail Modal */}
-      <ResourceDetail 
-        resource={selectedResource} 
+      <ResourceDetail
+        resource={selectedResource}
         onClose={() => setSelectedResource(null)}
         onOpenChat={() => setIsChatOpen(true)}
       />
 
-      {/* AI Chat Modal */}
-      <AIChatModal 
+      <AIChatModal
         resource={selectedResource}
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
@@ -118,23 +169,6 @@ const App: React.FC = () => {
             <p className="max-w-md text-sm leading-relaxed">
               Providing whole-university access to academic excellence. Our mission is to digitize Sharnbasava University's intellectual assets and make them available to every student, everywhere.
             </p>
-          </div>
-          <div>
-            <h4 className="text-white font-bold mb-4 uppercase text-xs tracking-widest">Navigation</h4>
-            <ul className="space-y-2 text-sm">
-              <li><a href="#" className="hover:text-white transition-colors">Home</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Browse Faculty Notes</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Exam Archive</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Request a Resource</a></li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="text-white font-bold mb-4 uppercase text-xs tracking-widest">Connect</h4>
-            <ul className="space-y-2 text-sm">
-              <li><a href="#" className="hover:text-white transition-colors">University Website</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Library Support</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Faculty Portal</a></li>
-            </ul>
           </div>
         </div>
         <div className="max-w-7xl mx-auto mt-12 pt-8 border-t border-slate-800 text-center text-xs">
